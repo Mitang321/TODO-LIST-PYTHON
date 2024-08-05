@@ -3,11 +3,12 @@ from cmd import Cmd
 
 
 class Task:
-    def __init__(self, title, description="", deadline="", category="", completed=False):
+    def __init__(self, title, description="", deadline="", category="", priority=1, completed=False):
         self.title = title
         self.description = description
         self.deadline = deadline
         self.category = category
+        self.priority = priority
         self.completed = completed
 
     def to_dict(self):
@@ -16,6 +17,7 @@ class Task:
             'description': self.description,
             'deadline': self.deadline,
             'category': self.category,
+            'priority': self.priority,
             'completed': self.completed
         }
 
@@ -25,30 +27,41 @@ class TaskManager:
         self.tasks = []
         self.load_tasks()
 
-    def add_task(self, title, description, deadline, category):
-        task = Task(title, description, deadline, category)
+    def add_task(self, title, description, deadline, category, priority):
+        task = Task(title, description, deadline, category, priority)
         self.tasks.append(task)
         self.save_tasks()
 
-    def list_tasks(self, filter_by=None):
-        for idx, task in enumerate(self.tasks):
-            if filter_by:
-                if filter_by == 'completed' and not task.completed:
-                    continue
-                elif filter_by == 'pending' and task.completed:
-                    continue
-                elif filter_by == task.category:
-                    continue
-            status = "Completed" if task.completed else "Pending"
-            print(f"{idx + 1}. {task.title} - {task.description} (Deadline: {task.deadline}, Category: {task.category}, Status: {status})")
+    def list_tasks(self, filter_by=None, sort_by=None):
+        filtered_tasks = self.tasks
+        if filter_by:
+            filtered_tasks = [
+                task for task in self.tasks
+                if (filter_by == 'completed' and task.completed) or
+                   (filter_by == 'pending' and not task.completed) or
+                   (filter_by == task.category)
+            ]
 
-    def edit_task(self, index, title=None, description=None, deadline=None, category=None):
+        if sort_by:
+            if sort_by == 'priority':
+                filtered_tasks = sorted(
+                    filtered_tasks, key=lambda x: x.priority)
+            elif sort_by == 'deadline':
+                filtered_tasks = sorted(
+                    filtered_tasks, key=lambda x: x.deadline)
+
+        for idx, task in enumerate(filtered_tasks):
+            status = "Completed" if task.completed else "Pending"
+            print(f"{idx + 1}. {task.title} - {task.description} (Deadline: {task.deadline}, Category: {task.category}, Priority: {task.priority}, Status: {status})")
+
+    def edit_task(self, index, title=None, description=None, deadline=None, category=None, priority=None):
         if 0 <= index < len(self.tasks):
             task = self.tasks[index]
             task.title = title or task.title
             task.description = description or task.description
             task.deadline = deadline or task.deadline
             task.category = category or task.category
+            task.priority = priority if priority is not None else task.priority
             self.save_tasks()
 
     def mark_task_completed(self, index):
@@ -109,6 +122,7 @@ class TaskManagerCLI(Cmd):
         self.current_user = None
 
     def do_register(self, arg):
+        "Register a new user: register username password"
         args = arg.split()
         if len(args) != 2:
             print("Usage: register username password")
@@ -118,6 +132,7 @@ class TaskManagerCLI(Cmd):
         print("User registered successfully!")
 
     def do_login(self, arg):
+        "Login as an existing user: login username password"
         args = arg.split()
         if len(args) != 2:
             print("Usage: login username password")
@@ -138,39 +153,51 @@ class TaskManagerCLI(Cmd):
         return stop
 
     def do_add(self, arg):
+        "Add a new task: add title description deadline category priority"
         if not self.current_user:
             print("You must be logged in to add tasks.")
             return
         args = arg.split()
-        if len(args) < 4:
-            print("Usage: add title description deadline category")
+        if len(args) < 5:
+            print("Usage: add title description deadline category priority")
             return
-        title, description, deadline, category = args[0], args[1], args[2], args[3]
-        self.task_manager.add_task(title, description, deadline, category)
+        title, description, deadline, category, priority = args[0], args[1], args[2], args[3], int(
+            args[4])
+        self.task_manager.add_task(
+            title, description, deadline, category, priority)
 
     def do_list(self, arg):
+        "List all tasks. Optional filters and sorting: list [completed|pending|<category>] [sort:priority|deadline]"
         if not self.current_user:
             print("You must be logged in to list tasks.")
             return
-        if arg in ['completed', 'pending'] or arg:
-            self.task_manager.list_tasks(filter_by=arg)
-        else:
-            self.task_manager.list_tasks()
+        args = arg.split()
+        filter_by = None
+        sort_by = None
+        if len(args) > 0:
+            if args[0] in ['completed', 'pending'] or args[0]:
+                filter_by = args[0]
+        if len(args) > 1 and args[1].startswith('sort:'):
+            sort_by = args[1].split(':')[1]
+        self.task_manager.list_tasks(filter_by=filter_by, sort_by=sort_by)
 
     def do_edit(self, arg):
+        "Edit a task: edit task_number title description deadline category priority"
         if not self.current_user:
             print("You must be logged in to edit tasks.")
             return
         args = arg.split()
-        if len(args) < 5:
-            print("Usage: edit task_number title description deadline category")
+        if len(args) < 6:
+            print("Usage: edit task_number title description deadline category priority")
             return
         index = int(args[0]) - 1
-        title, description, deadline, category = args[1], args[2], args[3], args[4]
+        title, description, deadline, category, priority = args[1], args[2], args[3], args[4], int(
+            args[5])
         self.task_manager.edit_task(
-            index, title, description, deadline, category)
+            index, title, description, deadline, category, priority)
 
     def do_complete(self, arg):
+        "Mark a task as completed: complete task_number"
         if not self.current_user:
             print("You must be logged in to complete tasks.")
             return
@@ -178,6 +205,7 @@ class TaskManagerCLI(Cmd):
         self.task_manager.mark_task_completed(index)
 
     def do_delete(self, arg):
+        "Delete a task: delete task_number"
         if not self.current_user:
             print("You must be logged in to delete tasks.")
             return
@@ -185,6 +213,7 @@ class TaskManagerCLI(Cmd):
         self.task_manager.delete_task(index)
 
     def do_exit(self, arg):
+        "Exit the task manager"
         print("Goodbye!")
         return True
 
