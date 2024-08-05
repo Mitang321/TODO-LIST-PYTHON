@@ -30,8 +30,15 @@ class TaskManager:
         self.tasks.append(task)
         self.save_tasks()
 
-    def list_tasks(self):
+    def list_tasks(self, filter_by=None):
         for idx, task in enumerate(self.tasks):
+            if filter_by:
+                if filter_by == 'completed' and not task.completed:
+                    continue
+                elif filter_by == 'pending' and task.completed:
+                    continue
+                elif filter_by == task.category:
+                    continue
             status = "Completed" if task.completed else "Pending"
             print(f"{idx + 1}. {task.title} - {task.description} (Deadline: {task.deadline}, Category: {task.category}, Status: {status})")
 
@@ -67,15 +74,73 @@ class TaskManager:
             pass
 
 
+class UserManager:
+    def __init__(self):
+        self.users = {}
+        self.load_users()
+
+    def add_user(self, username, password):
+        self.users[username] = password
+        self.save_users()
+
+    def authenticate_user(self, username, password):
+        return self.users.get(username) == password
+
+    def save_users(self):
+        with open('users.json', 'w') as f:
+            json.dump(self.users, f)
+
+    def load_users(self):
+        try:
+            with open('users.json', 'r') as f:
+                self.users = json.load(f)
+        except FileNotFoundError:
+            pass
+
+
 class TaskManagerCLI(Cmd):
     intro = "Welcome to the Task Manager. Type help or ? to list commands.\n"
     prompt = "(task-manager) "
 
     def __init__(self):
         super().__init__()
+        self.user_manager = UserManager()
         self.task_manager = TaskManager()
+        self.current_user = None
+
+    def do_register(self, arg):
+        args = arg.split()
+        if len(args) != 2:
+            print("Usage: register username password")
+            return
+        username, password = args
+        self.user_manager.add_user(username, password)
+        print("User registered successfully!")
+
+    def do_login(self, arg):
+        args = arg.split()
+        if len(args) != 2:
+            print("Usage: login username password")
+            return
+        username, password = args
+        if self.user_manager.authenticate_user(username, password):
+            self.current_user = username
+            print(f"User {username} logged in successfully!")
+        else:
+            print("Invalid username or password.")
+
+    def preloop(self):
+        print("Please log in or register to continue.")
+
+    def postcmd(self, stop, line):
+        if not self.current_user:
+            print("Please log in or register to continue.")
+        return stop
 
     def do_add(self, arg):
+        if not self.current_user:
+            print("You must be logged in to add tasks.")
+            return
         args = arg.split()
         if len(args) < 4:
             print("Usage: add title description deadline category")
@@ -84,9 +149,18 @@ class TaskManagerCLI(Cmd):
         self.task_manager.add_task(title, description, deadline, category)
 
     def do_list(self, arg):
-        self.task_manager.list_tasks()
+        if not self.current_user:
+            print("You must be logged in to list tasks.")
+            return
+        if arg in ['completed', 'pending'] or arg:
+            self.task_manager.list_tasks(filter_by=arg)
+        else:
+            self.task_manager.list_tasks()
 
     def do_edit(self, arg):
+        if not self.current_user:
+            print("You must be logged in to edit tasks.")
+            return
         args = arg.split()
         if len(args) < 5:
             print("Usage: edit task_number title description deadline category")
@@ -97,10 +171,16 @@ class TaskManagerCLI(Cmd):
             index, title, description, deadline, category)
 
     def do_complete(self, arg):
+        if not self.current_user:
+            print("You must be logged in to complete tasks.")
+            return
         index = int(arg) - 1
         self.task_manager.mark_task_completed(index)
 
     def do_delete(self, arg):
+        if not self.current_user:
+            print("You must be logged in to delete tasks.")
+            return
         index = int(arg) - 1
         self.task_manager.delete_task(index)
 
