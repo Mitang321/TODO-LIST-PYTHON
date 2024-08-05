@@ -1,4 +1,5 @@
 import json
+from cmd import Cmd
 
 
 class Task:
@@ -48,6 +49,11 @@ class TaskManager:
             self.tasks[index].completed = True
             self.save_tasks()
 
+    def delete_task(self, index):
+        if 0 <= index < len(self.tasks):
+            del self.tasks[index]
+            self.save_tasks()
+
     def save_tasks(self):
         with open('tasks.json', 'w') as f:
             json.dump([task.to_dict() for task in self.tasks], f)
@@ -61,43 +67,47 @@ class TaskManager:
             pass
 
 
-def main():
-    task_manager = TaskManager()
-    while True:
-        print("\n1. Add Task")
-        print("2. List Tasks")
-        print("3. Edit Task")
-        print("4. Mark Task as Completed")
-        print("5. Exit")
-        choice = input("Choose an option: ")
-        if choice == '1':
-            title = input("Enter task title: ")
-            description = input("Enter task description: ")
-            deadline = input("Enter task deadline: ")
-            category = input("Enter task category: ")
-            task_manager.add_task(title, description, deadline, category)
-        elif choice == '2':
-            task_manager.list_tasks()
-        elif choice == '3':
-            index = int(input("Enter task number to edit: ")) - 1
-            title = input(
-                "Enter new task title (leave blank to keep current): ")
-            description = input(
-                "Enter new task description (leave blank to keep current): ")
-            deadline = input(
-                "Enter new task deadline (leave blank to keep current): ")
-            category = input(
-                "Enter new task category (leave blank to keep current): ")
-            task_manager.edit_task(
-                index, title, description, deadline, category)
-        elif choice == '4':
-            index = int(input("Enter task number to mark as completed: ")) - 1
-            task_manager.mark_task_completed(index)
-        elif choice == '5':
-            break
-        else:
-            print("Invalid choice. Please try again.")
+class TaskManagerCLI(Cmd):
+    intro = "Welcome to the Task Manager. Type help or ? to list commands.\n"
+    prompt = "(task-manager) "
+
+    def __init__(self):
+        super().__init__()
+        self.task_manager = TaskManager()
+
+    def do_add(self, arg):
+        args = arg.split()
+        if len(args) < 4:
+            print("Usage: add title description deadline category")
+            return
+        title, description, deadline, category = args[0], args[1], args[2], args[3]
+        self.task_manager.add_task(title, description, deadline, category)
+
+    def do_list(self, arg):
+        self.task_manager.list_tasks()
+
+    def do_edit(self, arg):
+        args = arg.split()
+        if len(args) < 5:
+            print("Usage: edit task_number title description deadline category")
+            return
+        index = int(args[0]) - 1
+        title, description, deadline, category = args[1], args[2], args[3], args[4]
+        self.task_manager.edit_task(
+            index, title, description, deadline, category)
+
+    def do_complete(self, arg):
+        index = int(arg) - 1
+        self.task_manager.mark_task_completed(index)
+
+    def do_delete(self, arg):
+        index = int(arg) - 1
+        self.task_manager.delete_task(index)
+
+    def do_exit(self, arg):
+        print("Goodbye!")
+        return True
 
 
 if __name__ == "__main__":
-    main()
+    TaskManagerCLI().cmdloop()
