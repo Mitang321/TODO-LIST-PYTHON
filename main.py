@@ -2,18 +2,20 @@ import json
 
 
 class Task:
-    def __init__(self, title, description="", deadline="", category=""):
+    def __init__(self, title, description="", deadline="", category="", completed=False):
         self.title = title
         self.description = description
         self.deadline = deadline
         self.category = category
+        self.completed = completed
 
     def to_dict(self):
         return {
             'title': self.title,
             'description': self.description,
             'deadline': self.deadline,
-            'category': self.category
+            'category': self.category,
+            'completed': self.completed
         }
 
 
@@ -29,8 +31,22 @@ class TaskManager:
 
     def list_tasks(self):
         for idx, task in enumerate(self.tasks):
-            print(
-                f"{idx + 1}. {task.title} - {task.description} (Deadline: {task.deadline}, Category: {task.category})")
+            status = "Completed" if task.completed else "Pending"
+            print(f"{idx + 1}. {task.title} - {task.description} (Deadline: {task.deadline}, Category: {task.category}, Status: {status})")
+
+    def edit_task(self, index, title=None, description=None, deadline=None, category=None):
+        if 0 <= index < len(self.tasks):
+            task = self.tasks[index]
+            task.title = title or task.title
+            task.description = description or task.description
+            task.deadline = deadline or task.deadline
+            task.category = category or task.category
+            self.save_tasks()
+
+    def mark_task_completed(self, index):
+        if 0 <= index < len(self.tasks):
+            self.tasks[index].completed = True
+            self.save_tasks()
 
     def save_tasks(self):
         with open('tasks.json', 'w') as f:
@@ -50,7 +66,9 @@ def main():
     while True:
         print("\n1. Add Task")
         print("2. List Tasks")
-        print("3. Exit")
+        print("3. Edit Task")
+        print("4. Mark Task as Completed")
+        print("5. Exit")
         choice = input("Choose an option: ")
         if choice == '1':
             title = input("Enter task title: ")
@@ -61,6 +79,21 @@ def main():
         elif choice == '2':
             task_manager.list_tasks()
         elif choice == '3':
+            index = int(input("Enter task number to edit: ")) - 1
+            title = input(
+                "Enter new task title (leave blank to keep current): ")
+            description = input(
+                "Enter new task description (leave blank to keep current): ")
+            deadline = input(
+                "Enter new task deadline (leave blank to keep current): ")
+            category = input(
+                "Enter new task category (leave blank to keep current): ")
+            task_manager.edit_task(
+                index, title, description, deadline, category)
+        elif choice == '4':
+            index = int(input("Enter task number to mark as completed: ")) - 1
+            task_manager.mark_task_completed(index)
+        elif choice == '5':
             break
         else:
             print("Invalid choice. Please try again.")
